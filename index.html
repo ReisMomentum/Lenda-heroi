@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RPG Mobile: Eldoria</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;700&display=swap');
+
+        :root {
+            --primary: #2d3748;
+            --accent: #f6ad55;
+            --danger: #e53e3e;
+            --success: #38a169;
+        }
+
+        body {
+            background-color: #1a202c;
+            color: #f7fafc;
+            font-family: 'Lexend', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Layout de zonas */
+        .status-zone { height: 15%; }
+        .visual-zone { height: 35%; }
+        .log-zone { height: 20%; }
+        .control-zone { height: 30%; }
+
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: #4a5568;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .btn-mobile {
+            touch-action: manipulation;
+            transition: transform 0.1s, background-color 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-mobile:active {
+            transform: scale(0.95);
+            filter: brightness(1.2);
+        }
+
+        .log-entry {
+            animation: slideIn 0.3s ease-out;
+            border-left: 3px solid #4a5568;
+            padding-left: 8px;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .shake {
+            animation: shakeAnim 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shakeAnim {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .enemy-hit {
+            animation: flashRed 0.3s;
+        }
+
+        @keyframes flashRed {
+            50% { filter: sepia(1) saturate(10) hue-rotate(-50deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Zona de Status -->
+    <div class="status-zone p-4 bg-gray-800 flex justify-between items-center shadow-lg">
+        <div class="w-1/2">
+            <div class="flex justify-between items-end mb-1">
+                <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Vida</span>
+                <span id="hp-label" class="text-xs font-bold">20/20</span>
+            </div>
+            <div class="progress-bar">
+                <div id="hp-fill" class="bar-fill bg-red-500" style="width: 100%"></div>
+            </div>
+            <div class="flex justify-between items-end mt-2 mb-1">
+                <span class="text-xs font-bold uppercase tracking-wider text-gray-400">XP Nível <span id="lvl-label">1</span></span>
+                <span id="xp-label" class="text-xs font-bold">0/100</span>
+            </div>
+            <div class="progress-bar">
+                <div id="xp-fill" class="bar-fill bg-blue-500" style="width: 0%"></div>
+            </div>
+        </div>
+        <div class="text-right">
+            <div class="text-orange-400 font-bold text-xl">💰 <span id="gold-label">0</span></div>
+            <div class="text-gray-400 text-xs">Ataque: <span id="atk-label">5</span></div>
+        </div>
+    </div>
+
+    <!-- Zona Visual -->
+    <div class="visual-zone flex flex-col items-center justify-center relative bg-gray-900 overflow-hidden border-y border-gray-700">
+        <div id="enemy-container" class="transition-all duration-300 transform scale-125 opacity-0">
+            <div id="enemy-img" class="text-6xl mb-2">👾</div>
+            <div class="text-center">
+                <div id="enemy-name" class="font-bold text-lg text-white">Inimigo</div>
+                <div class="progress-bar w-32 mx-auto mt-1" style="height: 4px;">
+                    <div id="enemy-hp-fill" class="bar-fill bg-green-500" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="idle-msg" class="text-gray-500 italic text-center px-8">
+            A floresta está calma...<br>Toca em explorar para avançar.
+        </div>
+
+        <!-- Dano Popup -->
+        <div id="damage-text" class="absolute font-bold text-3xl text-red-500 pointer-events-none opacity-0 transition-all"></div>
+    </div>
+
+    <!-- Zona de Log (Mensagens) -->
+    <div id="log-box" class="log-zone p-4 overflow-y-auto bg-gray-950 text-sm flex flex-col-reverse">
+        <!-- Logs dinâmicos -->
+    </div>
+
+    <!-- Zona de Controlos -->
+    <div class="control-zone p-4 bg-gray-800 grid grid-cols-2 gap-3">
+        <!-- Explorar -->
+        <button id="btn-explore" onclick="game.explore()" class="btn-mobile bg-indigo-600 rounded-xl flex flex-col items-center justify-center font-bold shadow-lg active:bg-indigo-700">
+            <span class="text-2xl">🧭</span>
+            <span>Explorar</span>
+        </button>
+
+        <!-- Descansar -->
+        <button id="btn-rest" onclick="game.rest()" class="btn-mobile bg-emerald-600 rounded-xl flex flex-col items-center justify-center font-bold shadow-lg active:bg-emerald-700">
+            <span class="text-2xl">🏕️</span>
+            <span>Descansar</span>
+            <span class="text-[10px] opacity-75">Custo: 5 Ouro</span>
+        </button>
+
+        <!-- Atacar (Combate) -->
+        <button id="btn-attack" onclick="game.attack()" class="btn-mobile hidden bg-red-600 rounded-xl flex flex-col items-center justify-center font-bold shadow-lg col-span-1">
+            <span class="text-2xl">⚔️</span>
+            <span>Atacar</span>
+        </button>
+
+        <!-- Poção (Combate) -->
+        <button id="btn-potion" onclick="game.usePotion()" class="btn-mobile hidden bg-yellow-600 rounded-xl flex flex-col items-center justify-center font-bold shadow-lg col-span-1">
+            <span class="text-2xl">🧪</span>
+            <span>Poção (<span id="potion-count">1</span>)</span>
+        </button>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div id="modal" class="fixed inset-0 bg-black/90 flex items-center justify-center hidden z-50 p-6">
+        <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-xs text-center border-2 border-indigo-500">
+            <div id="modal-icon" class="text-5xl mb-4">🏆</div>
+            <h2 id="modal-title" class="text-2xl font-bold mb-2">Título</h2>
+            <p id="modal-body" class="text-gray-400 mb-6">Mensagem do modal.</p>
+            <button id="modal-btn" onclick="game.closeModal()" class="w-full bg-indigo-600 py-3 rounded-xl font-bold">Continuar</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            player: {
+                hp: 25, maxHp: 25,
+                atk: 6, def: 2,
+                gold: 10, xp: 0, maxXp: 60,
+                lvl: 1, potions: 2
+            },
+            enemies: [
+                { name: "Slime", hp: 15, atk: 4, xp: 20, gold: 5, emoji: "💧" },
+                { name: "Lobo", hp: 25, atk: 7, xp: 40, gold: 12, emoji: "🐺" },
+                { name: "Orc", hp: 50, atk: 12, xp: 100, gold: 30, emoji: "👹" },
+                { name: "Dragão", hp: 120, atk: 25, xp: 500, gold: 200, emoji: "🐲" }
+            ],
+            currentEnemy: null,
+            isCombat: false,
+
+            init() {
+                this.updateUI();
+                this.log("Bem-vindo a Eldoria. Toca em Explorar para começar a tua aventura!", "text-indigo-400");
+            },
+
+            log(msg, colorClass = "text-gray-300") {
+                const logBox = document.getElementById('log-box');
+                const div = document.createElement('div');
+                div.className = `log-entry ${colorClass} mb-2`;
+                div.innerHTML = msg;
+                logBox.prepend(div);
+            },
+
+            updateUI() {
+                const p = this.player;
+                document.getElementById('hp-label').innerText = `${Math.max(0, p.hp)}/${p.maxHp}`;
+                document.getElementById('hp-fill').style.width = `${(p.hp / p.maxHp) * 100}%`;
+
+                document.getElementById('xp-label').innerText = `${p.xp}/${p.maxXp}`;
+                document.getElementById('xp-fill').style.width = `${(p.xp / p.maxXp) * 100}%`;
+
+                document.getElementById('lvl-label').innerText = p.lvl;
+                document.getElementById('gold-label').innerText = p.gold;
+                document.getElementById('atk-label').innerText = p.atk;
+                document.getElementById('potion-count').innerText = p.potions;
+
+                // Alternar botões
+                document.getElementById('btn-explore').classList.toggle('hidden', this.isCombat);
+                document.getElementById('btn-rest').classList.toggle('hidden', this.isCombat);
+                document.getElementById('btn-attack').classList.toggle('hidden', !this.isCombat);
+                document.getElementById('btn-potion').classList.toggle('hidden', !this.isCombat);
+
+                document.getElementById('idle-msg').classList.toggle('hidden', this.isCombat);
+                document.getElementById('enemy-container').style.opacity = this.isCombat ? '1' : '0';
+
+                if (this.currentEnemy) {
+                    const e = this.currentEnemy;
+                    document.getElementById('enemy-name').innerText = e.name;
+                    document.getElementById('enemy-img').innerText = e.emoji;
+                    document.getElementById('enemy-hp-fill').style.width = `${(e.currentHp / e.hp) * 100}%`;
+                }
+            },
+
+            explore() {
+                if (Math.random() > 0.4) {
+                    this.startCombat();
+                } else {
+                    const g = Math.floor(Math.random() * 6) + 2;
+                    this.player.gold += g;
+                    this.log(`Encontraste um saco com <b>${g} ouro</b>!`, "text-yellow-400");
+                    this.updateUI();
+                }
+            },
+
+            rest() {
+                if (this.player.gold >= 5) {
+                    if (this.player.hp >= this.player.maxHp) {
+                        this.log("Já estás totalmente descansado.");
+                        return;
+                    }
+                    this.player.gold -= 5;
+                    this.player.hp = Math.min(this.player.maxHp, this.player.hp + 15);
+                    this.log("Descansaste na fogueira. Recuperaste vida.", "text-emerald-400");
+                    this.updateUI();
+                } else {
+                    this.log("Não tens ouro suficiente para descansar (5).", "text-red-400");
+                }
+            },
+
+            startCombat() {
+                const idx = Math.min(this.player.lvl - 1 + (Math.random() > 0.8 ? 1 : 0), this.enemies.length - 1);
+                const template = this.enemies[idx];
+                this.currentEnemy = { ...template, currentHp: template.hp };
+                this.isCombat = true;
+                this.log(`Um <b>${this.currentEnemy.name}</b> bloqueia o teu caminho!`, "text-red-400");
+                this.updateUI();
+            },
+
+            attack() {
+                if (!this.isCombat) return;
+
+                // Ataque do Jogador
+                const dmg = this.player.atk + Math.floor(Math.random() * 4);
+                this.currentEnemy.currentHp -= dmg;
+                this.popDamage(dmg, false);
+
+                const enemyImg = document.getElementById('enemy-img');
+                enemyImg.classList.add('enemy-hit');
+                setTimeout(() => enemyImg.classList.remove('enemy-hit'), 300);
+
+                if (this.currentEnemy.currentHp <= 0) {
+                    this.winCombat();
+                } else {
+                    this.enemyTurn();
+                }
+                this.updateUI();
+            },
+
+            enemyTurn() {
+                setTimeout(() => {
+                    if (!this.isCombat) return;
+                    const eDmg = Math.max(1, this.currentEnemy.atk - this.player.def);
+                    this.player.hp -= eDmg;
+                    this.popDamage(eDmg, true);
+
+                    document.body.classList.add('shake');
+                    setTimeout(() => document.body.classList.remove('shake'), 400);
+
+                    this.log(`O ${this.currentEnemy.name} causou <b>${eDmg} dano</b>.`);
+                    this.updateUI();
+
+                    if (this.player.hp <= 0) this.gameOver();
+                }, 400);
+            },
+
+            usePotion() {
+                if (this.player.potions > 0) {
+                    this.player.potions--;
+                    const heal = Math.floor(this.player.maxHp * 0.6);
+                    this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
+                    this.log(`Usaste poção! Recuperaste <b>${heal} HP</b>.`, "text-emerald-400");
+                    this.updateUI();
+                    this.enemyTurn();
+                }
+            },
+
+            winCombat() {
+                this.isCombat = false;
+                const e = this.currentEnemy;
+                this.player.xp += e.xp;
+                this.player.gold += e.gold;
+                this.log(`Derrotaste o ${e.name}! Ganhaste <b>${e.xp} XP</b> e <b>${e.gold} Ouro</b>.`, "text-yellow-400");
+
+                if (this.player.xp >= this.player.maxXp) this.levelUp();
+                this.currentEnemy = null;
+                this.updateUI();
+            },
+
+            levelUp() {
+                this.player.lvl++;
+                this.player.xp -= this.player.maxXp;
+                this.player.maxXp = Math.floor(this.player.maxXp * 1.6);
+                this.player.maxHp += 15;
+                this.player.hp = this.player.maxHp;
+                this.player.atk += 3;
+                this.player.def += 1;
+                this.player.potions += 1;
+
+                this.showModal("🏆", "Subiste de Nível!", `Agora és nível ${this.player.lvl}. As tuas estatísticas aumentaram e recebeste uma poção.`);
+            },
+
+            popDamage(val, isToPlayer) {
+                const el = document.getElementById('damage-text');
+                el.innerText = `-${val}`;
+                el.style.color = isToPlayer ? "#e53e3e" : "#f6e05e";
+                el.style.top = isToPlayer ? "20%" : "40%";
+                el.style.opacity = "1";
+                el.style.transform = "translateY(-20px)";
+
+                setTimeout(() => {
+                    el.style.opacity = "0";
+                    el.style.transform = "translateY(0)";
+                }, 500);
+            },
+
+            showModal(icon, title, body) {
+                document.getElementById('modal-icon').innerText = icon;
+                document.getElementById('modal-title').innerText = title;
+                document.getElementById('modal-body').innerText = body;
+                document.getElementById('modal').classList.remove('hidden');
+            },
+
+            closeModal() {
+                document.getElementById('modal').classList.add('hidden');
+            },
+
+            gameOver() {
+                this.showModal("💀", "Fim da Linha", "Foste derrotado nas profundezas de Eldoria. A tua lenda termina aqui.");
+                document.getElementById('modal-btn').innerText = "Renascer";
+                document.getElementById('modal-btn').onclick = () => location.reload();
+            }
+        };
+
+        // Impedir scroll de bounce no iOS
+        document.body.addEventListener('touchmove', function(e) {
+            if (e.target.id !== 'log-box') e.preventDefault();
+        }, { passive: false });
+
+        window.onload = () => game.init();
+    </script>
+</body>
+</html>
